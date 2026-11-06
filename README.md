@@ -8,22 +8,24 @@ The RDTech (RuiDeng) [UM24C](https://www.aliexpress.com/item/RD-UM24-UM24C-for-A
 
  * UM24C support is complete and tested.
  * UM25C and UM34C support should be complete, but has not been tested.  Hardware should arrive by March 2019.
- * Tested under Python 3.6, but should work with 3.4 or later.
+ * Requires Python 3.10 or later. Automated tests are configured for Python 3.10–3.14; actual support depends on test results and optional transport dependencies.
  * Linux: Tested fine with both PyBluez (direct) and pyserial (e.g. /dev/rfcomm0 via ```rfcomm bind```).
  * Windows: Tested fine with pyserial (e.g. COM4 as set up automatically by Windows).  Author could not get PyBluez compiled/installed.
  * MacOS: When using pyserial (e.g. /dev/cu.UM24C-Port as set up automatically by MacOS), writes to the device would succeed (e.g. 0xf2 to rotate the screen), but reads from the device never arrive.  Author could not get PyBluez compiled/installed.
 
 ## Setup
 
-rdumtool requires Python 3, and [PyBluez](https://pypi.org/project/PyBluez/) and/or [pyserial](https://pypi.org/project/pyserial/) modules.  Installation varies by operating system, but on Debian/Ubuntu, these are available via the python3-pybluez and python3-serial packages.
+rdumtool requires Python 3.10 or later. On Linux, a known Bluetooth address can be used via Python's built-in RFCOMM socket support, without PyBluez, provided the Python build includes Bluetooth socket support. Automatic Bluetooth discovery requires [PyBluez](https://pypi.org/project/PyBluez/), and serial connections require [pyserial](https://pypi.org/project/pyserial/). PyBluez installation and compatibility vary by operating system and Python version.
 
 To install rdumtool:
 
 ```
-$ sudo python3 setup.py install
+$ python3 -m pip install .
 ```
 
-rdumtool may also be run directly from its source directory without installation.
+For serial support, install with `python3 -m pip install '.[serial]'`. For development, use `python3 -m pip install -e '.[serial]'`. In an externally managed Python installation, use a virtual environment rather than `sudo`. rdumtool may also be run directly from its source directory with `python3 -m rdum`.
+
+Run the automated tests with `make test` and build a wheel with `make build`.
 
 ## Bluetooth setup
 
@@ -77,6 +79,58 @@ $ rdumtool --device-type=UM24C --serial-device=/dev/rfcomm0
 ```
 
 Without any additional arguments, rdumtool will display all information available from the device.  There are various additional flags to set parameters in the device such as threshold logging; see ```rdumtool --help``` for details.
+
+Some meters advertise under a different name, such as `E-test`. In that case, specify the Bluetooth address explicitly instead of relying on automatic discovery. Select the actual model with `--device-type`: UM24C and UM25C packets share markers but use different voltage and current scales, so the model cannot be identified from the packet markers alone. Reads time out after five seconds rather than waiting indefinitely.
+
+## Firmware and protocol notes
+
+rdumtool communicates with the meter; it does not read program memory, update firmware, or report a firmware build/version. The 130-byte status response has no firmware-version field, so this interface cannot recover a firmware image or identify its exact revision.
+
+The [sigrok reverse-engineering notes](https://sigrok.org/wiki/RDTech_UM24C) report that the manufacturer does not provide firmware updates and that the firmware is not designed to be upgradeable. They identify an STM8 microcontroller on the main board and exposed SWIM debugging pins, but whether the chip can be dumped is unclear. The same notes identify a Beken BK3231 Bluetooth module on the UM24C and a DX-BT18 module on the UM25C/UM34C; these are Bluetooth-module details, not firmware version identifiers. These hardware observations are from the referenced notes and may not cover every board revision.
+
+The C models expose a serial-over-Bluetooth interface. The protocol is reverse-engineered rather than manufacturer-documented: serial settings are 9600 baud, 8 data bits, no parity, and one stop bit. The host sends one-byte commands; `0xf0` requests a 130-byte status response, while control/configuration commands do not acknowledge. rdumtool uses a five-second read timeout and waits 0.5 seconds between configured commands.
+
+### Commands
+
+- `0xf0` (all models): Request status frame.
+- `0xf1` (all models): Next screen.
+- `0xf2` (all models): Rotate screen.
+- `0xf3`: Next data group on UM24C; previous screen on UM25C/UM34C.
+- `0xf4` (all models): Clear current data group.
+- `0xa0`–`0xa9` (UM25C/UM34C): Select data group 0–9.
+- `0xb0`–`0xce` (all models): Set recording threshold 0.00–0.30 A in 0.01 A steps.
+- `0xd0`–`0xd5` (all models): Set brightness 0–5.
+- `0xe0`–`0xe9` (all models): Set screen timeout 0–9 minutes; 0 disables it.
+
+### Status-frame layout
+
+Offsets are zero-based. Multi-byte values are unsigned, big-endian. The frame starts with a model marker and ends with a model-specific marker: UM24C and UM25C use `09 63` / `ff f1`; UM34C uses `0d 4c` / `80 68`. These markers do not distinguish UM24C from UM25C.
+
+- Bytes 0–1: Start marker.
+- Bytes 2–3: Voltage (UM25C: mV; UM24C/UM34C: 0.01 V).
+- Bytes 4–5: Current (UM25C: 0.1 mA; UM24C/UM34C: mA).
+- Bytes 6–9: Power (mW).
+- Bytes 10–11: Temperature in Celsius.
+- Bytes 12–13: Temperature in Fahrenheit.
+- Bytes 14–15: Selected data group (zero-based index).
+- Bytes 16–95: Ten data-group records, each 8 bytes: 4-byte mAh followed by 4-byte mWh.
+- Bytes 96–97: Positive data-line voltage (0.01 V).
+- Bytes 98–99: Negative data-line voltage (0.01 V).
+- Bytes 100–101: Charging-mode code (see below).
+- Bytes 102–105: Threshold-recorded capacity (mAh).
+- Bytes 106–109: Threshold-recorded energy (mWh).
+- Bytes 110–111: Recording threshold (0.01 A).
+- Bytes 112–115: Recording duration (seconds).
+- Bytes 116–117: Recording state (zero is off; nonzero is on).
+- Bytes 118–119: Screen timeout in minutes (zero means disabled).
+- Bytes 120–121: Screen brightness (level 0–5).
+- Bytes 122–125: Resistance (0.1 ohm).
+- Bytes 126–127: Selected screen index.
+- Bytes 128–129: End marker.
+
+Charging-mode codes interpreted by rdumtool are 0 unknown/normal, 1 Quick Charge 2.0, 2 Quick Charge 3.0, 3 Apple 2.4 A, 4 Apple 2.1 A, 5 Apple 1.0 A, 6 Apple 0.5 A, 7 DCP 1.5 A, and 8 Samsung. Detection capabilities vary by model; the meter's reported mode is not itself a firmware identifier.
+
+This packet layout and command map are reverse-engineered and are implemented in rdumtool, but UM25C and UM34C behavior has not been verified on hardware. Treat model-specific compatibility as provisional.
 
 ## Example
 

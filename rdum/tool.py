@@ -119,7 +119,7 @@ class RDUMTool:
     def print_json(self, response):
         out = {x: getattr(response, x) for x in response.labels}
         out['data_groups'] = [{'amp_hours': x.amp_hours, 'watt_hours': x.watt_hours} for x in out['data_groups']]
-        out['collection_time'] = (out['collection_time'] - datetime.datetime.fromtimestamp(0)).total_seconds()
+        out['collection_time'] = out['collection_time'].timestamp()
         print(json.dumps(out))
 
     def print_human(self, response):
@@ -144,7 +144,7 @@ class RDUMTool:
         print('Data: {:5.02f}V(+), {:5.02f}V(-), charging mode: {}'.format(
             response.data_line_positive_volts,
             response.data_line_negative_volts,
-            charging_map[response.charging_mode],
+            charging_map.get(response.charging_mode, 'Unknown ({})'.format(response.charging_mode)),
         ))
         print('Recording {:5}: {:8.03f}Ah, {:8.03f}Wh, {:6d} sec at >= {:4.02f}A'.format(
             '(on)' if response.recording else '(off)',
@@ -202,7 +202,7 @@ class RDUMTool:
             ('previous_screen', b'\xf3', ['UM25C', 'UM34C']),
             ('clear_data_group', b'\xf4', ['UM24C', 'UM25C', 'UM34C']),
             ('set_data_group', lambda x: bytes([0xa0 + x]), ['UM25C', 'UM34C']),
-            ('set_record_threshold', lambda x: bytes([0xb0 + int(x * 100)]), ['UM24C', 'UM25C', 'UM34C']),
+            ('set_record_threshold', lambda x: bytes([0xb0 + round(x * 100)]), ['UM24C', 'UM25C', 'UM34C']),
             ('set_screen_brightness', lambda x: bytes([0xd0 + x]), ['UM24C', 'UM25C', 'UM34C']),
             ('set_screen_timeout', lambda x: bytes([0xe0 + x]), ['UM24C', 'UM25C', 'UM34C']),
         ]:
@@ -244,8 +244,7 @@ class RDUMTool:
                     self.args.bluetooth_device = mac
                     self.args.device_type = name
             if not self.args.bluetooth_device:
-                logging.error('No suitable Bluetooth device found')
-                return
+                raise RuntimeError('No suitable Bluetooth device found; specify --bluetooth-device if its name differs')
         if self.args.bluetooth_device:
             logging.info('Connecting to {} {}'.format(self.args.device_type, self.args.bluetooth_device))
             self.dev = rdum.DeviceBluetooth(self.args.bluetooth_device)
@@ -300,7 +299,8 @@ class RDUMTool:
             self.loop()
         except KeyboardInterrupt:
             pass
-        self.dev.close()
+        finally:
+            self.dev.close()
 
 
 def main():

@@ -19,6 +19,7 @@
 import struct
 import datetime
 import logging
+import socket
 
 __version__ = '0.1'
 
@@ -34,22 +35,40 @@ CHARGING_SAMSUNG = 8
 
 
 class DeviceBluetooth:
-    dev = None
-
     def __init__(self, mac=None):
-        import bluetooth
+        self.dev = None
+        try:
+            import bluetooth
+        except ImportError:
+            bluetooth = None
         self.bluetooth = bluetooth
 
         if mac is not None:
             self.connect(mac)
 
     def scan(self):
+        if self.bluetooth is None:
+            raise RuntimeError('Bluetooth discovery requires PyBluez; specify --bluetooth-device instead')
         return self.bluetooth.discover_devices(duration=8, lookup_names=True, lookup_class=True)
 
     def connect(self, mac):
         logging.debug('OPEN')
-        self.dev = self.bluetooth.BluetoothSocket(self.bluetooth.RFCOMM)
-        self.dev.connect((mac, 1))
+        native = all(hasattr(socket, name) for name in ('AF_BLUETOOTH', 'BTPROTO_RFCOMM'))
+        if native:
+            self.dev = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
+        elif self.bluetooth is not None:
+            self.dev = self.bluetooth.BluetoothSocket(self.bluetooth.RFCOMM)
+        else:
+            raise RuntimeError('Bluetooth RFCOMM is unavailable; install PyBluez or use a serial device')
+        try:
+            if native:
+                self.dev.settimeout(5)
+            self.dev.connect((mac, 1))
+            if not native:
+                self.dev.settimeout(5)
+        except Exception:
+            self.dev.close()
+            raise
 
     def close(self):
         if self.dev is None:
@@ -59,22 +78,24 @@ class DeviceBluetooth:
 
     def send(self, data):
         logging.debug('SEND: {}'.format(repr(data)))
-        self.dev.send(data)
+        self.dev.sendall(data)
 
     def recv(self):
         data = b''
         while(len(data) < 130):
-            data += self.dev.recv(1024)
+            chunk = self.dev.recv(130 - len(data))
+            if not chunk:
+                raise IOError('Bluetooth connection closed after {} of 130 bytes'.format(len(data)))
+            data += chunk
         logging.debug('RECV: {}'.format(repr(data)))
         return data
 
 
 class DeviceSerial:
-    dev = None
-
     def __init__(self, device=None):
         import serial
         self.serial = serial
+        self.dev = None
 
         if device is not None:
             self.connect(device)
@@ -85,7 +106,8 @@ class DeviceSerial:
         self.dev.port = device
         self.dev.baudrate = 9600
         self.dev.parity = 'N'
-        self.dev.writeTimeout = 0
+        self.dev.timeout = 5
+        self.dev.write_timeout = 5
         self.dev.open()
 
     def close(self):
@@ -96,12 +118,16 @@ class DeviceSerial:
 
     def send(self, data):
         logging.debug('SEND: {}'.format(repr(data)))
-        self.dev.write(data)
+        if self.dev.write(data) != len(data):
+            raise IOError('Incomplete serial write')
 
     def recv(self):
         data = b''
         while(len(data) < 130):
-            data += self.dev.read()
+            chunk = self.dev.read(130 - len(data))
+            if not chunk:
+                raise IOError('Serial read timed out after {} of 130 bytes'.format(len(data)))
+            data += chunk
         logging.debug('RECV: {}'.format(repr(data)))
         return data
 
@@ -149,17 +175,17 @@ class Response:
             'volts': (
                 'Volts', 2, 2,
                 lambda x: x / (100 * self.device_multiplier),
-                lambda x: int(x * (100 * self.device_multiplier)),
+                lambda x: round(x * (100 * self.device_multiplier)),
             ),
             'amps': (
                 'Amps', 4, 2,
                 lambda x: x / (1000 * self.device_multiplier),
-                lambda x: int(x * (1000 * self.device_multiplier)),
+                lambda x: round(x * (1000 * self.device_multiplier)),
             ),
             'watts': (
                 'Watts', 6, 4,
                 lambda x: x / 1000,
-                lambda x: int(x * 1000),
+                lambda x: round(x * 1000),
             ),
             'temp_c': (
                 'Temperature (Celsius)', 10, 2,
@@ -179,12 +205,12 @@ class Response:
             'data_line_positive_volts': (
                 'Positive data line volts', 96, 2,
                 lambda x: x / 100,
-                lambda x: int(x * 100),
+                lambda x: round(x * 100),
             ),
             'data_line_negative_volts': (
                 'Negative data line volts', 98, 2,
                 lambda x: x / 100,
-                lambda x: int(x * 100),
+                lambda x: round(x * 100),
             ),
             'charging_mode': (
                 'Charging mode', 100, 2,
@@ -194,17 +220,17 @@ class Response:
             'record_amphours': (
                 'Recorded amp-hours', 102, 4,
                 lambda x: x / 1000,
-                lambda x: int(x * 1000),
+                lambda x: round(x * 1000),
             ),
             'record_watthours': (
                 'Recorded watt-hours', 106, 4,
                 lambda x: x / 1000,
-                lambda x: int(x * 1000),
+                lambda x: round(x * 1000),
             ),
             'record_threshold': (
                 'Recording threshold (Amps)', 110, 2,
                 lambda x: x / 100,
-                lambda x: int(x * 100),
+                lambda x: round(x * 100),
             ),
             'record_seconds': (
                 'Recorded time (Seconds)', 112, 4,
@@ -229,7 +255,7 @@ class Response:
             'resistance': (
                 'Resistance (Ohms)', 122, 4,
                 lambda x: x / 10,
-                lambda x: int(x * 10),
+                lambda x: round(x * 10),
             ),
             'screen_selected': (
                 'Currently selected screen', 126, 2,
@@ -271,8 +297,8 @@ class Response:
             if (data_group.group > 9) or (data_group.group < 0):
                 continue
             pos = 16 + (data_group.group * 8)
-            data[pos:pos+4] = struct.pack('>L', int(data_group.amp_hours * 1000))
-            data[pos+4:pos+8] = struct.pack('>L', int(data_group.watt_hours * 1000))
+            data[pos:pos+4] = struct.pack('>L', round(data_group.amp_hours * 1000))
+            data[pos+4:pos+8] = struct.pack('>L', round(data_group.watt_hours * 1000))
         return bytes(data)
 
     def load(self, data):

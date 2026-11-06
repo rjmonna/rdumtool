@@ -1,20 +1,21 @@
 PYTHON := python3
 PANDOC := pandoc
 
+.PHONY: all build test install clean doc
+
 all: build
 
 build:
-	$(PYTHON) setup.py build
+	$(PYTHON) -m pip wheel --no-deps --wheel-dir dist .
 
-test: build
-	$(PYTHON) setup.py test
+test:
+	$(PYTHON) -Wd -m unittest discover -v
 
-install: build
-	$(PYTHON) setup.py install
+install:
+	$(PYTHON) -m pip install .
 
 clean:
-	$(PYTHON) setup.py clean
-	$(RM) -r build MANIFEST
+	$(RM) -r build dist rdumtool.egg-info
 
 doc: README
 
