@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RDUM meter</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><h1>RDUM meter</h1><p id="status" role="status">Connecting...</p></header>
+    <section aria-labelledby="measurements-title">
+      <h2 id="measurements-title">Live measurements <span id="model"></span></h2>
+      <div id="measurements" class="grid"></div>
+    </section>
+    <section>
+      <h2>Recording and device</h2>
+      <div id="details" class="grid"></div>
+      <h3>Data groups</h3>
+      <table><thead><tr><th>Group</th><th>Capacity (Ah)</th><th>Energy (Wh)</th></tr></thead>
+        <tbody id="groups"></tbody></table>
+    </section>
+    <section>
+      <h2>Controls</h2>
+      <p>Commands are sent immediately; the meter does not acknowledge them.</p>
+      <div class="buttons">
+        <button data-command="next_screen">Next screen</button>
+        <button data-command="previous_screen" data-models="UM25C UM34C">Previous screen</button>
+        <button data-command="rotate_screen">Rotate screen</button>
+        <button data-command="next_data_group" data-models="UM24C">Next data group</button>
+        <button data-command="clear_data_group" id="clear-group">Clear current data group</button>
+      </div>
+      <div id="settings">
+        <form data-models="UM25C UM34C">
+          <label>Data group (0-9)
+            <input name="set_data_group" type="number" min="0" max="9" step="1">
+          </label>
+          <button type="submit">Set</button>
+        </form>
+        <form>
+          <label>Recording threshold (A, 0.00-0.30)
+            <input name="set_record_threshold" type="number" min="0" max="0.30" step="0.01">
+          </label>
+          <button type="submit">Set</button>
+        </form>
+        <form>
+          <label>Screen brightness (0-5)
+            <input name="set_screen_brightness" type="number" min="0" max="5" step="1">
+          </label>
+          <button type="submit">Set</button>
+        </form>
+        <form>
+          <label>Screen timeout (minutes, 0-9; 0 = off)
+            <input name="set_screen_timeout" type="number" min="0" max="9" step="1">
+          </label>
+          <button type="submit">Set</button>
+        </form>
+      </div>
+      <p id="command-status" role="status"></p>
+    </section>
+  </main>
+</body>
+</html>

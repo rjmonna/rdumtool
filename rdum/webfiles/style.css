@@ -1,0 +1,19 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { margin: 0; background: light-dark(#f2f5f8, #151b22); }
+main { max-width: 1000px; margin: auto; padding: 1.5rem; }
+section { background: light-dark(white, #222b35); border-radius: .6rem; padding: 1.2rem; margin: 1rem 0; }
+h1, h2, h3 { margin-top: 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .75rem; }
+.metric { padding: .8rem; background: light-dark(#f2f5f8, #151b22); border-radius: .4rem; }
+.metric strong, .metric span { display: block; }
+.metric strong { font-size: 1.3rem; margin-top: .3rem; }
+.buttons { display: flex; flex-wrap: wrap; gap: .5rem; }
+button, input { font: inherit; padding: .45rem; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+#settings { display: grid; gap: .8rem; margin-top: 1rem; }
+form, label { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+input { width: 6rem; }
+[hidden] { display: none !important; }
+table { border-collapse: collapse; width: 100%; text-align: left; }
+td, th { padding: .4rem; border-bottom: 1px solid #8886; }

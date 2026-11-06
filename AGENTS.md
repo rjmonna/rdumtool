@@ -9,14 +9,14 @@
 
 ## Architecture
 
-`rdum/__init__.py` contains the device-facing layer: Bluetooth and serial transport classes, charging-mode constants, and `Response`, which decodes and encodes the device's 130-byte data packet. `rdum/tool.py` is the CLI and application layer: it parses options, selects a transport, sends device commands, reads responses, and formats human-readable or JSON output. The top-level `rdumtool` launcher and the `setup.py` console-script entry point both invoke `rdum.tool.main`.
+`rdum/device.py` contains the device-facing layer: Bluetooth and serial transport classes, charging-mode constants, and `Response`, which decodes and encodes the device's 130-byte data packet. These are re-exported by `rdum/__init__.py` for compatibility. `rdum/controller.py` shares command validation, status reads, and JSON serialization between `rdum/tool.py` (the CLI) and `rdum/web.py` (the local web server). Web assets live in `rdum/webfiles/`. The top-level `rdumtool` launcher and console-script entry point both invoke `rdum.tool.main`.
 
 The CLI supports UM24C, UM25C, and UM34C. Device-specific response markers and command compatibility are handled explicitly in the protocol and CLI layers; the README notes that UM24C is tested while UM25C and UM34C are not.
 
 ## Repository-specific conventions
 
 - Keep packet layout, big-endian field decoding/encoding, unit conversions, and response labels centralized in `Response._std_defs` and `Response`; keep transport I/O in `DeviceBluetooth` and `DeviceSerial`.
-- When changing device commands, preserve the per-model compatibility checks in `RDUMTool.send_commands`. The command byte values and model support differ, even where command-line options are shared.
+- When changing device commands, preserve the per-model compatibility checks in `rdum.controller`. The command byte values and model support differ, even where command-line options are shared.
 - UM25C voltage/current values use a different scale, represented by `Response.device_multiplier`; preserve that distinction when changing measurement conversion.
-- `rdum/__init__.py` is also the source of `__version__`, which `setup.py` reads for package metadata.
+- `rdum/__init__.py` is also the source of `__version__`, which the package metadata reads.
 - The package requires Python 3.10 or later; keep syntax and APIs compatible with that minimum.

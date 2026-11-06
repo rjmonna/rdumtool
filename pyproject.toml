@@ -28,9 +28,13 @@ Upstream = "https://github.com/rfinnie/rdumtool"
 
 [project.scripts]
 rdumtool = "rdum.tool:main"
+rdumweb = "rdum.web:main"
 
 [tool.setuptools]
 packages = ["rdum"]
+
+[tool.setuptools.package-data]
+rdum = ["webfiles/*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "rdum.__version__"}

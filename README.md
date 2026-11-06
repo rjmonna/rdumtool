@@ -82,6 +82,19 @@ Without any additional arguments, rdumtool will display all information availabl
 
 Some meters advertise under a different name, such as `E-test`. In that case, specify the Bluetooth address explicitly instead of relying on automatic discovery. Select the actual model with `--device-type`: UM24C and UM25C packets share markers but use different voltage and current scales, so the model cannot be identified from the packet markers alone. Reads time out after five seconds rather than waiting indefinitely.
 
+## Local web interface
+
+The web interface uses the same Bluetooth or serial connection as the CLI; the meter's USB ports measure power and are not used to communicate with it. For example:
+
+```
+rdumweb --device-type UM24C --bluetooth-device 00:90:72:56:98:D7
+# Or: rdumweb --device-type UM24C --serial-device /dev/rfcomm0
+```
+
+From the source directory, `python3 -m rdum.web` accepts the same options. Open the printed address, normally `http://127.0.0.1:8765/`, in a browser on the same computer. Use `--port` to choose another port. If no device is specified, the same PyBluez discovery as the CLI is used. Serial connections require the `serial` extra described above.
+
+The page refreshes measurements every two seconds and provides model-compatible screen, recording, and data-group controls. Commands are not acknowledged by the meter; check the refreshed status to confirm settings. Clearing a data group removes its recorded values. Stop the server with Ctrl-C before using the CLI on the same device. The server is intentionally bound to loopback with no authentication; do not expose it through a proxy or port forwarding.
+
 ## Firmware and protocol notes
 
 rdumtool communicates with the meter; it does not read program memory, update firmware, or report a firmware build/version. The 130-byte status response has no firmware-version field, so this interface cannot recover a firmware image or identify its exact revision.

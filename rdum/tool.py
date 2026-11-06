@@ -21,10 +21,10 @@ import sys
 import os
 import json
 import time
-import datetime
 import logging
 
 from . import __version__
+from . import controller
 import rdum
 
 
@@ -117,10 +117,7 @@ def parse_args(argv=None):
 
 class RDUMTool:
     def print_json(self, response):
-        out = {x: getattr(response, x) for x in response.labels}
-        out['data_groups'] = [{'amp_hours': x.amp_hours, 'watt_hours': x.watt_hours} for x in out['data_groups']]
-        out['collection_time'] = out['collection_time'].timestamp()
-        print(json.dumps(out))
+        print(json.dumps(controller.response_dict(response)))
 
     def print_human(self, response):
         logging.debug('DUMP: {}'.format(repr(response.dump())))
@@ -194,31 +191,15 @@ class RDUMTool:
             print('Collection time: {}'.format(response.collection_time))
 
     def send_commands(self):
-        # TODO: Verify UM25C/UM34C
-        for arg, command_val, compat in [
-            ('next_screen', b'\xf1', ['UM24C', 'UM25C', 'UM34C']),
-            ('rotate_screen', b'\xf2', ['UM24C', 'UM25C', 'UM34C']),
-            ('next_data_group', b'\xf3', ['UM24C']),
-            ('previous_screen', b'\xf3', ['UM25C', 'UM34C']),
-            ('clear_data_group', b'\xf4', ['UM24C', 'UM25C', 'UM34C']),
-            ('set_data_group', lambda x: bytes([0xa0 + x]), ['UM25C', 'UM34C']),
-            ('set_record_threshold', lambda x: bytes([0xb0 + round(x * 100)]), ['UM24C', 'UM25C', 'UM34C']),
-            ('set_screen_brightness', lambda x: bytes([0xd0 + x]), ['UM24C', 'UM25C', 'UM34C']),
-            ('set_screen_timeout', lambda x: bytes([0xe0 + x]), ['UM24C', 'UM25C', 'UM34C']),
-        ]:
+        for arg, (_, compat) in controller.COMMANDS.items():
             arg_val = getattr(self.args, arg)
             if (arg_val is None) or (arg_val is False):
                 continue
             if self.args.device_type not in compat:
                 logging.warning('{} not supported on this device, ignoring'.format(arg))
                 continue
-            if type(command_val) != bytes:
-                command_val = command_val(getattr(self.args, arg))
             logging.info('Setting {} to {}'.format(arg, getattr(self.args, arg)))
-            self.dev.send(command_val)
-            # Sometimes you can send multiple commands quickly, but sometimes
-            # it'll eat commands.  Sleeping 0.5s between commands is safe.
-            time.sleep(0.5)
+            controller.send_command(self.dev, arg, arg_val, self.args.device_type)
 
     def setup_logging(self):
         logging_format = '%(message)s'
@@ -257,19 +238,11 @@ class RDUMTool:
     def loop(self):
         while True:
             try:
-                self.dev.send(b'\xf0')
+                response = controller.read_response(self.dev, self.args.device_type)
                 if self.args.json:
-                    self.print_json(rdum.Response(
-                        self.dev.recv(),
-                        collection_time=datetime.datetime.now(),
-                        device_type=self.args.device_type,
-                    ))
+                    self.print_json(response)
                 else:
-                    self.print_human(rdum.Response(
-                        self.dev.recv(),
-                        collection_time=datetime.datetime.now(),
-                        device_type=self.args.device_type,
-                    ))
+                    self.print_human(response)
             except KeyboardInterrupt:
                 raise
             except Exception:
