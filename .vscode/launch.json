@@ -1,0 +1,72 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "RDUM web (Bluetooth)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "rdum.web",
+      "args": [
+        "--device-type",
+        "${input:deviceType}",
+        "--bluetooth-device",
+        "${input:bluetoothAddress}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "stopOnEntry": false,
+      "pythonArgs": ["-Xfrozen_modules=off"]
+    },
+    {
+      "name": "RDUM web (serial)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "rdum.web",
+      "args": [
+        "--device-type",
+        "${input:deviceType}",
+        "--serial-device",
+        "${input:serialDevice}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "stopOnEntry": false,
+      "pythonArgs": ["-Xfrozen_modules=off"]
+    },
+    {
+      "name": "Python: Debug web tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "unittest",
+      "args": [
+        "tests.test_web"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "stopOnEntry": false,
+      "pythonArgs": ["-Xfrozen_modules=off"]
+    }
+  ],
+  "inputs": [
+    {
+      "id": "deviceType",
+      "type": "promptString",
+      "description": "Meter model (UM24C, UM25C, or UM34C)",
+      "default": "UM24C"
+    },
+    {
+      "id": "bluetoothAddress",
+      "type": "promptString",
+      "description": "Bluetooth MAC address",
+      "default": "73:37:1A:0C:01:8E"
+    },
+    {
+      "id": "serialDevice",
+      "type": "promptString",
+      "description": "Serial device path",
+      "default": "/dev/rfcomm0"
+    }
+  ]
+}

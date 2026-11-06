@@ -95,6 +95,10 @@ From the source directory, `python3 -m rdum.web` accepts the same options. Open 
 
 The page refreshes measurements every two seconds and provides model-compatible screen, recording, and data-group controls. Commands are not acknowledged by the meter; check the refreshed status to confirm settings. Clearing a data group removes its recorded values. Stop the server with Ctrl-C before using the CLI on the same device. The server is intentionally bound to loopback with no authentication; do not expose it through a proxy or port forwarding.
 
+### VS Code debugging
+
+Install the recommended Microsoft Python extension, then open the Run and Debug view and select `RDUM web (Bluetooth)` or `RDUM web (serial)` to start the web server under the debugger. VS Code prompts for the model and device address or serial path. The Bluetooth address defaults to this repository owner's meter (advertised as `E-test`); replace it with yours. Meters with other advertised names need the address given explicitly. To debug the web code without hardware, select `Python: Debug web tests`.
+
 ## Firmware and protocol notes
 
 rdumtool communicates with the meter; it does not read program memory, update firmware, or report a firmware build/version. The 130-byte status response has no firmware-version field, so this interface cannot recover a firmware image or identify its exact revision.

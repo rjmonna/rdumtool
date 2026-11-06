@@ -4,6 +4,7 @@
 
 - `make` or `make build` builds a wheel with `python3 -m pip wheel`.
 - `make test` runs `python3 -Wd -m unittest discover -v`; individual tests can be run with `python3 -m unittest tests.test_device`.
+- VS Code debugging uses `.vscode/launch.json` (`RDUM web (Bluetooth)`, `RDUM web (serial)`, `Python: Debug web tests`); the Bluetooth address defaults to the maintainer's meter, which advertises as `E-test`, so automatic discovery cannot find it and `--bluetooth-device` is required.
 - No lint target or linter configuration is present.
 - `make doc` regenerates the plain-text `README` from `README.md` using Pandoc. `README.md` is the editable source; do not hand-edit the generated `README`.
 
